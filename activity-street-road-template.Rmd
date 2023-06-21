@@ -1,6 +1,6 @@
 ---
 title: "Activity: Street or Road?"
-author: "YOUR NAME HERE"
+author: "Vydeepthi Dhuilpalla"
 output: html_notebook
 ---
 
@@ -8,10 +8,13 @@ output: html_notebook
 
 ```{r}
 #load libraries 
-
+install.packages("dplyr")                                
+library("dplyr")  
+library(readr)
+library(stringi)
 #load in the data here 
 # we will only be using the "street-addresses.csv" file from the text
-
+Addresses <- read_csv("https://mdbeckman.github.io/dcSupplement/data/street-addresses.csv")
 
 
 ```
@@ -19,13 +22,61 @@ output: html_notebook
 ## Recreate Solved Example using `sample(50)`
 
 ```{r}
+Sample <- Addresses %>% sample_n(size = 50)
 
+View(Sample)
+# Find cases that match the "PO" pattern
+pattern <- "PO"
+Matches <- Sample %>% 
+  filter(grepl(pattern, address))
+
+# Find cases that don't match the "PO" pattern
+Dont <- Sample %>% 
+  filter(!grepl(pattern, address))
+
+# Improve the pattern to capture the box number
+pattern <- "BOX\\s+(\\d+)"
+Matches <- Sample %>% 
+  filter(grepl(pattern, address))
+Dont <- Sample %>% 
+  filter(!grepl(pattern, address))
+
+# Extract the box numbers using tidyr::extract()
+BoxNumbers <- Sample %>%
+  filter(grepl(pattern, address)) %>%
+  tidyr::extract(address, into = "boxnum", regex = pattern)
+
+# Print the extracted box numbers
+BoxNumbers$boxnum
 
 ```
 
 ## Recreate Soved Example using the entire `Address` data set
 
 ```{r}
+# Read the street address data
+Addresses <- read_csv("https://mdbeckman.github.io/dcSupplement/data/street-addresses.csv")
+
+
+# Find cases that match the "PO" pattern
+pattern <- "PO"
+Matches <- Addresses %>% filter(grepl(pattern, address))
+
+# Find cases that don't match the "PO" pattern
+Dont <- Addresses %>% filter(!grepl(pattern, address))
+
+# Improve the pattern to capture the box number
+pattern <- "BOX\\s+(\\d+)"
+Matches <- Addresses %>% filter(grepl(pattern, address))
+Dont <- Addresses %>% filter(!grepl(pattern, address))
+
+# Extract the box numbers using tidyr::extract()
+BoxNumbers <- Addresses %>%
+  filter(grepl(pattern, address)) %>%
+  tidyr::extract(address, into = "boxnum", regex = pattern)
+
+# Print the extracted box numbers
+print(BoxNumbers$boxnum)
 
 
 ```
@@ -33,7 +84,15 @@ output: html_notebook
 #### Additional Question: How many addresses are a PO BOX (including NCSU BOX)? 
 
 ```{r}
+# Filter addresses that match the "PO BOX" or "NCSU BOX" pattern
+pattern <- "PO BOX|NCSU BOX"
+POBoxAddresses <- Addresses %>% filter(grepl(pattern, address))
 
+# Count the number of PO BOX addresses
+numPOBoxAddresses <- nrow(POBoxAddresses)
+
+# Print the result
+print(numPOBoxAddresses)
 
 ```
 
@@ -55,20 +114,50 @@ LeftOvers <-
 ```
 
 My answer here.......
+1. The variable pattern is assigned to the pattern (ST|RD|ROAD) 
+2. New variable LeftOvers is initialised
+3. This line used the pipe operator to pass Addresses data frame as the first argument to the next function 
+4. The filter() function is used on the Addresses data frame in this line. It gets rid of rows where the address column fits the pattern that was set up before. The grepl() method is used to match patterns, and the! operator turns the result into the opposite of what it was.
+5. This line adds another rule to the process of screening. It gets rid of rows where the address column meets the pattern "sAPT|UNITs[d]+$" in a regular expression. This pattern works with addresses that end with "APT" or "UNIT" followed by a space and a number.
+6. This line adds another condition to the filtering process. It removes rows where the address column contains the substring " BOX ".
 
 #### Part 2: Implement your method on the entire `Addresses` data set. Explain how your code works line by line.
 
 ```{r}
 
+pattern <- "(ST|RD|ROAD)"
+LeftOvers <- Addresses %>%
+  filter(
+    !grepl(pattern, address),
+    !grepl("\\sAPT|UNIT\\s[\\d]+$", address),
+    !grepl(" BOX ", address)
+  )
 
 
 ```
 
 My answer here.......
+In this implementation, the code filters the Addresses data frame based on three conditions: street endings, "APT" or "UNIT" followed by a number, and the substring " BOX ". The resulting filtered addresses are stored in the LeftOvers variable.
 
 #### Additional Question 1: Present your result from part 2 by providing a table in descending order of popularity for the street name endings you found
 
 ```{r}
+# Count occurrences of street name endings
+# Extract street name endings using sub
+street_endings <- sub(".+\\s([A-Z]+)$", "\\1", LeftOvers$address)
+
+# Count occurrences of street name endings
+street_endings_counts <- table(street_endings)
+
+# Create a data frame with the street name endings and their counts
+result <- data.frame(Street_Name_Ending = names(street_endings_counts),
+                     Count = as.vector(street_endings_counts))
+
+# Sort the data frame in descending order of count
+result <- result[order(result$Count, decreasing = TRUE), ]
+
+# Display the result table
+result
 
 
 ```
@@ -78,9 +167,28 @@ My answer here.......
 Note: make sure your order street names according to popularity, not alphabetically.
 
 ```{r}
+library(ggplot2)
+
+# Create a data frame with the street name endings and their counts
+result <- data.frame(Street_Name_Ending = names(street_endings_counts),
+                     Count = as.vector(street_endings_counts))
+
+# Sort the data frame in descending order of count
+result <- result[order(result$Count, decreasing = TRUE), ]
+
+# Create the bar plot
+ggplot(result, aes(x = reorder(Street_Name_Ending, -Count), y = Count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Street Name Ending", y = "Count", title = "Street Name Endings Popularity") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
+  coord_flip()
+
 
 ```
 
 #### Additional Question 3: Comment on any patterns you see
 
 My answer here.......
+The most popular ending for a street name is "St," followed by "Ave" and "Dr." Compared to other ends, these three have much higher counts.
+Some middle-range street name endings, like "Cir" and "Ln," seem to be more common than others, but they still don't have as many as the top three endings.
